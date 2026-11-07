@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Rozana Tasks",
+  "description": "Rozana - Daily Task Manager and Routine Planner for organizing daily activities, habits, and priorities",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,3 +1,14 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">Rozana Tasks</string>
+    <string name="app_tagline">Daily Task &amp; Routine Planner</string>
+    <string name="tab_today">Today (आज)</string>
+    <string name="tab_upcoming">Upcoming (आगामी)</string>
+    <string name="tab_habits">Habits (आदतें)</string>
+    <string name="tab_completed">Completed (पूर्ण)</string>
+    <string name="add_task">Add Task (टास्क जोड़ें)</string>
+    <string name="edit_task">Edit Task (टास्क बदलें)</string>
+    <string name="task_title_hint">What needs to be done? (क्या काम करना है?)</string>
+    <string name="task_desc_hint">Details or notes (वैकल्पिक विवरण)</string>
+    <string name="empty_tasks_title">All clear for today!</string>
+    <string name="empty_tasks_desc">You have completed all scheduled tasks. Tap + to plan your next routine.</string>
 </resources>
