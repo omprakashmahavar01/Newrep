@@ -8,7 +8,10 @@ import com.example.data.model.SubTask
 import com.example.data.model.TaskCategory
 import com.example.data.model.TaskEntity
 import com.example.data.model.TaskPriority
+import com.example.data.model.UserProfile
 import com.example.data.repository.TaskRepository
+import com.example.data.repository.UserPreferencesRepository
+import com.example.util.SpeechManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +39,9 @@ data class TaskUiState(
   val bestHabitStreak: Int = 0,
   val isAddSheetOpen: Boolean = false,
   val isTemplateSheetOpen: Boolean = false,
+  val isProfileSheetOpen: Boolean = false,
+  val isMobileAuthOpen: Boolean = false,
+  val userProfile: UserProfile = UserProfile(),
   val editingTask: TaskEntity? = null,
   val isSearchOpen: Boolean = false
 )
@@ -46,6 +52,8 @@ private data class InternalFilterState(
   val searchQuery: String = "",
   val isAddSheetOpen: Boolean = false,
   val isTemplateSheetOpen: Boolean = false,
+  val isProfileSheetOpen: Boolean = false,
+  val isMobileAuthOpen: Boolean = false,
   val editingTask: TaskEntity? = null,
   val isSearchOpen: Boolean = false
 )
@@ -53,6 +61,8 @@ private data class InternalFilterState(
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
   private val repository: TaskRepository
+  private val userPreferencesRepository = UserPreferencesRepository(application)
+  private val speechManager = SpeechManager(application)
   private val _filterState = MutableStateFlow(InternalFilterState())
 
   init {
@@ -62,8 +72,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
   val uiState: StateFlow<TaskUiState> = combine(
     repository.allTasks,
-    _filterState
-  ) { allTasks: List<TaskEntity>, filter: InternalFilterState ->
+    _filterState,
+    userPreferencesRepository.userProfile
+  ) { allTasks: List<TaskEntity>, filter: InternalFilterState, profile: UserProfile ->
 
     val todayCalendar = Calendar.getInstance().apply {
       set(Calendar.HOUR_OF_DAY, 0)
@@ -122,6 +133,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
       bestHabitStreak = maxStreak,
       isAddSheetOpen = filter.isAddSheetOpen,
       isTemplateSheetOpen = filter.isTemplateSheetOpen,
+      isProfileSheetOpen = filter.isProfileSheetOpen,
+      isMobileAuthOpen = filter.isMobileAuthOpen,
+      userProfile = profile,
       editingTask = filter.editingTask,
       isSearchOpen = filter.isSearchOpen
     )
@@ -176,9 +190,61 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     _filterState.value = _filterState.value.copy(isTemplateSheetOpen = false)
   }
 
+  fun openProfileSheet() {
+    _filterState.value = _filterState.value.copy(isProfileSheetOpen = true)
+  }
+
+  fun closeProfileSheet() {
+    _filterState.value = _filterState.value.copy(isProfileSheetOpen = false)
+  }
+
+  fun openMobileAuth() {
+    _filterState.value = _filterState.value.copy(isMobileAuthOpen = true)
+  }
+
+  fun closeMobileAuth() {
+    _filterState.value = _filterState.value.copy(isMobileAuthOpen = false)
+  }
+
+  fun verifyPhoneNumber(phoneNumber: String, userName: String) {
+    userPreferencesRepository.verifyPhoneNumber(phoneNumber, userName)
+    closeMobileAuth()
+    speechManager.speak("मोबाइल नंबर सही है! आपका स्वागत है ${userName.ifBlank { "साथी" }}!")
+  }
+
+  fun updateUserProfile(newProfile: UserProfile) {
+    userPreferencesRepository.updateProfile(newProfile)
+    closeProfileSheet()
+    speechManager.speak("प्रोफाइल सफलतापूर्वक अपडेट हो गई!")
+  }
+
+  fun speak(text: String) {
+    speechManager.speak(text)
+  }
+
+  fun speakTodaySummary() {
+    val state = uiState.value
+    val profile = state.userProfile
+    val remaining = maxOf(0, state.totalTodayCount - state.completedTodayCount)
+    val text = "नमस्ते ${profile.userName}! आज आपके कुल ${state.totalTodayCount} कार्यों में से ${state.completedTodayCount} कार्य पूरे हो चुके हैं, और $remaining कार्य बाकी हैं। लक्ष्य की ओर बढ़ते रहें!"
+    speechManager.speak(text)
+  }
+
+  fun speakTask(task: TaskEntity) {
+    val status = if (task.isCompleted) "यह कार्य सही और पूर्ण हो चुका है।" else "यह कार्य अभी पेंडिंग है।"
+    val text = "टास्क: ${task.title}। समय: ${task.timeSlot}। स्थिति: $status"
+    speechManager.speak(text)
+  }
+
   fun toggleTaskCompletion(task: TaskEntity) {
     viewModelScope.launch {
+      val isNowCompleted = !task.isCompleted
       repository.toggleTaskCompletion(task)
+      if (isNowCompleted) {
+        speechManager.speak("शाबाश! कार्य सही और पूरा हो गया: ${task.title}")
+      } else {
+        speechManager.speak("${task.title} पेंडिंग सूची में है।")
+      }
     }
   }
 
@@ -216,6 +282,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
       )
       if (id == 0L) {
         repository.insertTask(task)
+        speechManager.speak("नया टास्क सही से जुड़ गया: ${task.title}")
       } else {
         val existing = _filterState.value.editingTask
         val updated = task.copy(
@@ -224,6 +291,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
           completedAtMillis = existing?.completedAtMillis
         )
         repository.updateTask(updated)
+        speechManager.speak("टास्क अपडेट हो गया!")
       }
       closeAddSheet()
     }
@@ -232,12 +300,14 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
   fun deleteTask(task: TaskEntity) {
     viewModelScope.launch {
       repository.deleteTask(task)
+      speechManager.speak("टास्क हटा दिया गया।")
     }
   }
 
   fun deleteCompletedTasks() {
     viewModelScope.launch {
       repository.deleteCompletedTasks()
+      speechManager.speak("सभी पूर्ण कार्य सूची से हटा दिए गए।")
     }
   }
 
@@ -245,6 +315,46 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch {
       repository.applyRoutineTemplate(templateName)
       closeTemplateSheet()
+      speechManager.speak("रूटीन टेम्पलेट सफलता से लागू हो गया!")
     }
+  }
+
+  fun getExportReport(): String {
+    val state = uiState.value
+    val profile = state.userProfile
+    val sb = StringBuilder()
+    sb.appendLine("📋 Rozana Tasks - दैनिक कार्य रिपोर्ट व बैकअप")
+    sb.appendLine("👤 उपयोगकर्ता: ${profile.userName} (${profile.avatarEmoji})")
+    if (profile.phoneNumber.isNotBlank()) {
+      sb.appendLine("📱 मोबाइल: +91 ${profile.phoneNumber}")
+    }
+    sb.appendLine("🎯 दैनिक लक्ष्य: ${profile.dailyTargetTasks} कार्य")
+    if (profile.customMotto.isNotBlank()) {
+      sb.appendLine("💡 विचार: ${profile.customMotto}")
+    }
+    sb.appendLine("📊 आज की प्रगति: ${state.completedTodayCount}/${state.totalTodayCount} पूर्ण (${state.progressPercent}%)")
+    if (state.bestHabitStreak > 0) {
+      sb.appendLine("🔥 सक्रिय स्ट्रीक: ${state.bestHabitStreak} दिन")
+    }
+    sb.appendLine("----------------------------------------")
+    sb.appendLine("कार्य सूची (Tasks List):")
+    if (state.tasks.isEmpty()) {
+      sb.appendLine("(कोई टास्क नहीं है)")
+    } else {
+      state.tasks.forEachIndexed { index, task ->
+        val status = if (task.isCompleted) "[✓ पूर्ण]" else "[  बाकी ]"
+        sb.appendLine("${index + 1}. $status ${task.title}")
+        if (task.timeSlot.isNotBlank()) sb.appendLine("   समय: ${task.timeSlot}")
+        if (task.description.isNotBlank()) sb.appendLine("   नोट्स: ${task.description}")
+      }
+    }
+    sb.appendLine("----------------------------------------")
+    sb.appendLine("Rozana Tasks App द्वारा सफलतापूर्वक निर्यातित")
+    return sb.toString()
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    speechManager.shutdown()
   }
 }

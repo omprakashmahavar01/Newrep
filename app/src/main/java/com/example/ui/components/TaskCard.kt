@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -73,6 +74,7 @@ fun TaskCard(
   onToggleSubtask: (String) -> Unit,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
+  onSpeakTask: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   var isExpanded by remember { mutableStateOf(false) }
@@ -188,6 +190,19 @@ fun TaskCard(
               )
             )
           }
+        }
+
+        // Speaker button to speak task aloud
+        IconButton(
+          onClick = onSpeakTask,
+          modifier = Modifier.testTag("task_speak_button_${task.id}")
+        ) {
+          Icon(
+            imageVector = Icons.Default.VolumeUp,
+            contentDescription = "बोलकर सुनाएं",
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+            modifier = Modifier.size(20.dp)
+          )
         }
 
         // Action menu

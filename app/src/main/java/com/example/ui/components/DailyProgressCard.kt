@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +17,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
@@ -38,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.UserProfile
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -45,11 +47,14 @@ import java.util.Locale
 
 @Composable
 fun DailyProgressCard(
+  userProfile: UserProfile = UserProfile(),
   totalCount: Int,
   completedCount: Int,
   progressPercent: Int,
   bestStreak: Int,
   onOpenTemplates: () -> Unit,
+  onOpenProfile: () -> Unit = {},
+  onSpeakSummary: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val animatedProgress by animateFloatAsState(
@@ -60,9 +65,9 @@ fun DailyProgressCard(
 
   val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
   val greeting = when {
-    currentHour < 12 -> "सुप्रभात • Good Morning ☀️"
-    currentHour < 17 -> "शुभ दोपहर • Good Afternoon 🌤️"
-    else -> "शुभ संध्या • Good Evening 🌙"
+    currentHour < 12 -> "सुप्रभात • Good Morning"
+    currentHour < 17 -> "शुभ दोपहर • Good Afternoon"
+    else -> "शुभ संध्या • Good Evening"
   }
 
   val dateFormat = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
@@ -97,18 +102,38 @@ fun DailyProgressCard(
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically
         ) {
-          Column {
-            Text(
-              text = greeting,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Text(
-              text = todayString,
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-            )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onOpenProfile() }
+          ) {
+            Box(
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface),
+              contentAlignment = Alignment.Center
+            ) {
+              Text(
+                text = userProfile.avatarEmoji,
+                fontSize = 22.sp
+              )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column {
+              Text(
+                text = "नमस्ते, ${userProfile.userName}!",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+              )
+              Text(
+                text = "$greeting • $todayString",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+              )
+            }
           }
 
           if (bestStreak > 0) {
@@ -154,7 +179,7 @@ fun DailyProgressCard(
               )
               Spacer(modifier = Modifier.width(8.dp))
               Text(
-                text = "($completedCount/$totalCount कार्य पूर्ण)",
+                text = "($completedCount/$totalCount कार्य पूर्ण • लक्ष्य: ${userProfile.dailyTargetTasks})",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -178,8 +203,9 @@ fun DailyProgressCard(
 
             val motivationalQuote = when {
               totalCount == 0 -> "आज की योजना शुरू करने के लिए टास्क जोड़ें!"
-              progressPercent == 100 -> "शानदार! आज के सभी कार्य पूर्ण हो गए! 🎉"
+              completedCount >= userProfile.dailyTargetTasks -> "शानदार! आज का व्यक्तिगत लक्ष्य पूरा हुआ! 🏆"
               progressPercent >= 50 -> "बढ़िया गति! आधे से ज्यादा काम पूरा हो गया!"
+              userProfile.customMotto.isNotBlank() -> userProfile.customMotto
               else -> "एक-एक कदम से हर लक्ष्य प्राप्त होता है।"
             }
 
@@ -192,21 +218,41 @@ fun DailyProgressCard(
 
           Spacer(modifier = Modifier.width(16.dp))
 
-          FilledTonalButton(
-            onClick = onOpenTemplates,
-            modifier = Modifier.testTag("open_templates_button"),
-            shape = RoundedCornerShape(14.dp)
-          ) {
-            Icon(
-              imageVector = Icons.Default.AutoAwesome,
-              contentDescription = null,
-              modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = "रुटीन",
-              fontWeight = FontWeight.SemiBold
-            )
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+              onClick = onSpeakSummary,
+              modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .testTag("speak_summary_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.VolumeUp,
+                contentDescription = "बोलकर सुनाएं",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+              )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            FilledTonalButton(
+              onClick = onOpenTemplates,
+              modifier = Modifier.testTag("open_templates_button"),
+              shape = RoundedCornerShape(14.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = "रुटीन",
+                fontWeight = FontWeight.SemiBold
+              )
+            }
           }
         }
       }
